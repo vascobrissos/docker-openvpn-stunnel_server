@@ -85,7 +85,7 @@ ca /etc/openvpn/ca.crt
 cert /etc/openvpn/server.crt
 key /etc/openvpn/server.key
 dh /etc/openvpn/dh.pem
-server 10.8.0.0 255.255.255.0
+server 10.9.0.0 255.255.255.0
 push "redirect-gateway def1 bypass-dhcp"
 push "dhcp-option DNS 8.8.8.8"
 push "dhcp-option DNS 8.8.4.4"
@@ -113,7 +113,7 @@ $ apt-get install iptables
 $ ip a
 
 #Add rule to iptables
-$ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+$ iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE
 
 #Install persistent iptables and choose yes
 $ apt-get install iptables-persistent
