@@ -7,14 +7,17 @@ Showing how to install OpenVPN Server on a docker container.
 
 Port-forward needed ports on your router/etc.
 
+OpenVPN client: https://openvpn.net/community-downloads/
+Stunnel client: https://www.stunnel.org/downloads.html
+
 Assuming you alredy have docker installed. If not, I ran this. https://docs.docker.com/engine/install/debian/
 
 #Download latest debian image
 $ docker pull debian
 
 #Create a container with privileges (not sure if needed but most likely needed due to network interfaces (something to do with tun0)) and with port XXXX open. 
-#Example: docker run --privileged -p 2000:2000/udp -d -t --name vpnserver debian
-$ docker run --privileged -p XXXX:XXXX/XXX -d -t --name XXXXX debian
+#Example: docker run --privileged -p 2000:2000/tcp -d -t --name vpnserver debian
+$ docker run --privileged -p XXXX:XXXX/tcp -d -t --name XXXXX debian
 
 #Get shell access
 #Example: docker exec -it vpnserver bash
@@ -72,8 +75,8 @@ $ cp pki/dh.pem /etc/openvpn/
 $ nano /etc/openvpn/server.conf
 
 #Insert following content
-port <your port>
-proto udp
+port 1194
+proto tcp
 dev tun
 tun-mtu 1500
 tun-mtu-extra 32
@@ -98,7 +101,7 @@ verb 3
 $ service openvpn restart
 
 #Check if server is running
-$ servive openvpn status
+$ service openvpn status
 
 #Check if port forwarding is enabled (1)
 $ cat /proc/sys/net/ipv4/ip_forward
@@ -118,15 +121,66 @@ $ apt-get install iptables-persistent
 #Create client key and certificate
 $ ./easyrsa gen-req <choose client name> nopass
 $ ./easyrsa sign-req client <client name>
-  
+
+#cd into stunnel folder
+$ cd /etc/stunnel/
+
+#Build stunnel key.pem
+$ openssl genrsa -out key.pem 2048
+
+#Build stunnel certificate
+$ openssl req -new -x509 -key key.pem -out cert.pem -days 3650
+
+#Combine key and certificate into pem file (you leave password field empty)
+$ cat key.pem cert.pem >> stunnel.pem
+$ openssl pkcs12 -export -out stunnel.p12 -inkey key.pem -in cert.pem
+
+#Create stunnel.conf
+$ nano stunnel.conf
+
+#Insert following content
+chroot = /var/lib/stunnel4
+pid = /stunnel4.pid
+setuid = stunnel4
+setgid = stunnel4
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+cert = /etc/stunnel/stunnel.pem
+[openvpn]
+accept = <port you want>
+connect = localhost:1194
+cert = /etc/stunnel/stunnel.pem
+#Insert following content
+
+#Edit stunnel4
+$ nano /etc/default/stunnel4
+#Append "ENABLED=1" on first line after 3 comments
+
+#Exit container and restart it
+$ exit
+$ docker restart <container name>
+
+#Copy stunnel.pem to folder which will be used on config below
+
+#Open stunnel client and right click icon to "Edit Configuration"
+#Insert following content
+[openvpn]
+client = yes
+accept = localhost:1194
+connect = <your ip>:<your port>
+cert = C:\Users\EXAMPLE\Documents\stunnel.pem
+#Insert following content
+#Reload configuration and check log
+
 #cd into /etc/openvpn/
 $ cd /etc/openvpn/
 
 #Create .ovpn profile on your desktop with following content
 client
 dev tun
-proto udp
-remote <your ip> <your port> #remote example.com 1994
+proto tcp
+remote localhost 1194
+route <your ip> 255.255.255.255 net_gateway
 resolv-retry infinite
 nobind
 tun-mtu 1500
